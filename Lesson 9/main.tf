@@ -9,13 +9,15 @@ terraform {
 provider "yandex" {
   # Configuration options
   service_account_key_file = file("../key.json")
-  zone                     = "ru-central1-a"
+  zone                     = var.zone //"ru-central1-a"
 }
+
+
 
 //Working with data sources
 //Get Cloud ID
 data "yandex_resourcemanager_cloud" "cloudID" {
-  name = "cloud-ie"
+  name = var.cloudName //"cloud-ie"
 }
 //Get Folder ID
 data "yandex_resourcemanager_folder" "folderID" {
@@ -25,12 +27,12 @@ data "yandex_resourcemanager_folder" "folderID" {
 
 data "yandex_compute_image" "ubuntuLatest" {
   //If you specify family without folder_id then lookup takes place in the 'standard-images' folder.
-  family = "ubuntu-2204-lts"
+  family = var.ubuntu-version
 }
 
 data "yandex_compute_image" "lampLatest" {
   //If you specify family without folder_id then lookup takes place in the 'standard-images' folder.
-  family = "lamp"
+  family = var.lamp-version
 }
 
 data "yandex_vpc_network" "default" {
@@ -74,7 +76,10 @@ resource "yandex_compute_instance_group" "vm" {
       memory = 2
       //core_fraction = 20
     }
-    //***************************************
+    labels = merge(var.my-labels, {
+      "age" = "int-55",
+      "enviroment" = "${var.my-labels["color"]}-enviroment"
+    })
     network_interface {
       subnet_ids = [
         data.yandex_vpc_network.default.subnet_ids.0,
@@ -83,7 +88,7 @@ resource "yandex_compute_instance_group" "vm" {
       ]
     }
     scheduling_policy {
-      preemptible = true
+      preemptible = var.is-preemptible
     }
     description = "My web resource"
     name        = "my-instance-{instance.index}"
@@ -110,7 +115,7 @@ resource "yandex_compute_instance_group" "vm" {
   description                  = "My highly available web server"
   max_checking_health_duration = 120
   allocation_policy {
-    zones = ["ru-central1-a", "ru-central1-b", "ru-central1-c"]
+    zones = var.allowed_zones
   }
 }
 
@@ -136,23 +141,4 @@ resource "yandex_lb_network_load_balancer" "lb" {
 
   }
   folder_id = data.yandex_resourcemanager_folder.folderID.folder_id
-
-}
-
-
-
-output "cloudID" {
-  value = data.yandex_resourcemanager_cloud.cloudID.cloud_id
-}
-
-output "folderID" {
-  value = data.yandex_resourcemanager_folder.folderID.folder_id
-}
-
-output "imageID" {
-  value = data.yandex_compute_image.ubuntuLatest.id
-}
-output "IP" {
-  value = yandex_lb_network_load_balancer.lb.listener
-
 }
