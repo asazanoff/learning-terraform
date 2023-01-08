@@ -1,0 +1,14 @@
+#cloud-config
+users:
+  - name: admin
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+      
+package_update: true
+
+packages:
+  - apache2
+
+runcmd:
+  - sudo service httpd start

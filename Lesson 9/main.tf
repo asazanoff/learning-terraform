@@ -12,39 +12,6 @@ provider "yandex" {
   zone                     = var.zone //"ru-central1-a"
 }
 
-
-
-//Working with data sources
-//Get Cloud ID
-data "yandex_resourcemanager_cloud" "cloudID" {
-  name = var.cloudName //"cloud-ie"
-}
-//Get Folder ID
-data "yandex_resourcemanager_folder" "folderID" {
-  cloud_id = data.yandex_resourcemanager_cloud.cloudID.cloud_id
-  name     = "default"
-}
-
-data "yandex_compute_image" "ubuntuLatest" {
-  //If you specify family without folder_id then lookup takes place in the 'standard-images' folder.
-  family = var.ubuntu-version
-}
-
-data "yandex_compute_image" "lampLatest" {
-  //If you specify family without folder_id then lookup takes place in the 'standard-images' folder.
-  family = var.lamp-version
-}
-
-data "yandex_vpc_network" "default" {
-  name      = "default"
-  folder_id = data.yandex_resourcemanager_folder.folderID.id
-}
-
-data "yandex_iam_service_account" "sa" {
-  name      = "service"
-  folder_id = data.yandex_resourcemanager_folder.folderID.id
-}
-
 resource "yandex_compute_instance_group" "vm" {
   service_account_id = data.yandex_iam_service_account.sa.id
   folder_id          = data.yandex_resourcemanager_folder.folderID.folder_id
@@ -66,9 +33,11 @@ resource "yandex_compute_instance_group" "vm" {
     startup_duration = 120
   }
   instance_template {
+    platform_id = var.platformVersion
     boot_disk {
       initialize_params {
-        image_id = data.yandex_compute_image.lampLatest.id
+        size = 8
+        image_id = "${var.isTest ? data.yandex_compute_image.lampLatest.id : data.yandex_compute_image.ubuntuLatest.id }"
       }
     }
     resources {
@@ -87,6 +56,9 @@ resource "yandex_compute_instance_group" "vm" {
         data.yandex_vpc_network.default.subnet_ids.2
       ]
     }
+    metadata =  {
+      user-data = "${var.isTest ? file("metadata-dev.txt") : file("metadata-prod.txt") }"
+    }
     scheduling_policy {
       preemptible = var.is-preemptible
     }
@@ -95,7 +67,7 @@ resource "yandex_compute_instance_group" "vm" {
   }
   name = "website-group"
   health_check {
-    interval            = 6
+    interval            = var.isTest == true ? 6 : 10
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
@@ -141,4 +113,21 @@ resource "yandex_lb_network_load_balancer" "lb" {
 
   }
   folder_id = data.yandex_resourcemanager_folder.folderID.folder_id
+}
+resource "yandex_compute_instance" "bastion" {
+  count = var.isTest ? 1 : 0
+  boot_disk {
+    initialize_params {
+      image_id = data.yandex_compute_image.ubuntuLatest.id
+      size = 10
+    }
+  }
+  resources {
+    cores = 2
+    memory = 2
+  }
+  network_interface {
+    subnet_id = data.yandex_vpc_network.default.subnet_ids.0
+  }
+  platform_id = lookup(var.instance-type, "prod") // X = lookup(map, key)
 }

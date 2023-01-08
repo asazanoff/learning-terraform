@@ -8,10 +8,6 @@ variable "cloudName" {
   type        = string
 }
 
-variable "ubuntu-version" {
-  description = "Ubuntu family:"
-  type        = string
-}
 
 variable "lamp-version" {
   description = "LAMP version:"

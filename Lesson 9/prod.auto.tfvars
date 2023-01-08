@@ -12,5 +12,4 @@ my-labels = {
   "food"   = "russian"
 }
 platformVersion = "standard-v3"
-isTest = true
-
+isTest = false
